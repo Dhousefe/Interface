@@ -46,6 +46,7 @@ import ext.mods.gameserver.network.SystemMessageId;
 import ext.mods.gameserver.network.serverpackets.ActionFailed;
 import ext.mods.gameserver.network.serverpackets.CreatureSay;
 import ext.mods.gameserver.network.serverpackets.ExAutoSoulShot;
+import ext.mods.gameserver.network.serverpackets.ExShowVariationMakeWindow;
 import ext.mods.gameserver.network.serverpackets.MagicSkillUse;
 import ext.mods.gameserver.network.serverpackets.NpcHtmlMessage;
 import ext.mods.gameserver.network.serverpackets.SetupGauge;
@@ -114,12 +115,6 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
         return "Interface_BrProject";
     }
 
-    @Override
-    public boolean onBypass(Player player, String command) {
-        _virtualThreadExecutor.execute(() -> handleCommandAsync(player, command));
-        return true; // Assume que todos os comandos prefixados são manipulados
-    }
-
     private void handleCommandAsync(Player player, String command) {
         try {
             if (command.startsWith("RequestAutoShot:")) {
@@ -134,8 +129,8 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
                 AutoFarmManager.getInstance().handleBypass(player, "skills page 1");
             } else if (command.startsWith("_radiusAutoFarm")) {
                 handleRadiusAutoFarm(player, command);
-            } else if (command.startsWith("autoshot ")) {
-                handleAutoShot(player, command);
+            } else if (command.equals("_daniloAugment")) {
+                handleAugmentOpen(player);
             } else if (command.startsWith(BYPASS_PREFIX)) {
                 final String actualCommand = command.substring(BYPASS_PREFIX.length()).trim();
                 handleBypass(player, actualCommand);
@@ -147,6 +142,39 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
             LOGGER.warn(Level.SEVERE, "[" + getName() + "] Error processing command '" + command + "' for player " + player.getName(), e);
         }
     }
+    
+    
+    @Override
+    public boolean onBypass(Player player, String command) {
+        // Only handle commands that start with our BYPASS_PREFIX or specific known commands
+        //LOGGER.info("[" + getName() + "] Received bypass from " + player.getName() + ": " + command);
+        if (command.startsWith(BYPASS_PREFIX) ||
+            command.startsWith("RequestAutoShot:") ||
+            command.startsWith("GkGo ") ||
+            command.startsWith("BuffEngine_Dispel") ||
+            command.startsWith("autofarm") ||
+            command.startsWith("_autofarm") ||
+            command.equals("_infosettings") ||
+            command.startsWith("_radiusAutoFarm") ||
+            command.equals("_daniloAugment")) {
+            
+            _virtualThreadExecutor.execute(() -> handleCommandAsync(player, command));
+            
+            return true; // Indicate that this bypass was handled by this listener
+        }
+        
+        return false; // Indicate that this bypass was not handled by this listener
+
+    }
+
+    private void handleAugmentOpen(Player player) {
+        if (player == null) {
+            return;
+        }
+        player.sendPacket(SystemMessageId.SELECT_THE_ITEM_TO_BE_AUGMENTED);
+        player.sendPacket(ExShowVariationMakeWindow.STATIC_PACKET);
+    }
+
     
     private void handleRequestAutoShot(Player player, String command) {
         try {
@@ -200,6 +228,8 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
                 case "dec_radius" -> Math.min(currentRadius - 100, autoFarmProfile.getAreaMaxRadius());
                 default -> currentRadius;
             };
+
+            newRadius = Math.max(100, Math.min(newRadius, 1500));
 
             autoFarmProfile.setRadius(newRadius);
             AutoFarmManager.getInstance().handleBypass(player, "options");
@@ -305,19 +335,7 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
         }
     }
 
-    private void handleAutoShot(Player player, String command) {
-        var parts = command.split(" ");
-        if (parts.length > 1) {
-            try {
-                int shotId = Integer.parseInt(parts[1]);
-                boolean currentlyActive = player.getAutoSoulShot().contains(shotId);
-                setAutoShotState(player, shotId, !currentlyActive);
-            } catch (NumberFormatException e) {
-                LOGGER.warn("[" + getName() + "] Invalid shotId in autoshot command: " + command);
-            }
-        }
-    }
-
+    
     private void setAutoShotState(Player player, int shotId, boolean enable) {
         if (player.isInStoreMode() || player.isDead()) {
             return;
@@ -333,12 +351,14 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
         if (enable && !isActive) {
             player.addAutoSoulShot(shotId);
             player.sendPacket(new ExAutoSoulShot(shotId, 0));
-            player.sendPacket(SystemMessage.getSystemMessage(SystemMessageId.AVOIDED_S1_ATTACK).addItemName(item));
+            player.sendPacket(SystemMessage.getSystemMessage(SystemMessageId.YOU_FEEL_S1_EFFECT).addItemName(item));
+            player.sendMessage("Ativado com sucesso: " + item.getItem().getName());
             useShot(player, item);
         } else if (!enable && isActive) {
             player.removeAutoSoulShot(shotId);
             player.sendPacket(new ExAutoSoulShot(shotId, 0));
-            player.sendPacket(SystemMessage.getSystemMessage(SystemMessageId.CANNOT_USE_SOULSHOTS).addItemName(item));
+            //player.sendPacket(SystemMessage.getSystemMessage(SystemMessageId.CANNOT_USE_SOULSHOTS).addItemName(item));
+            player.sendMessage("Desativado com sucesso: " + item.getItem().getName());
         }
     }
 
