@@ -1,0 +1,59 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE project>
+<project name="L2JBASE_MOD_TUTORIAL" default="dist-local" basedir=".">
+	<scriptdef name="substring" language="javascript">
+		<attribute name="text" />
+		<attribute name="start" />
+		<attribute name="end" />
+		<attribute name="property" />
+		<![CDATA[
+		var text = attributes.get("text");
+		var start = attributes.get("start");
+		var end = attributes.get("end") || text.length();
+		project.setProperty(attributes.get("property"), text.substring(start, end));
+		]]>
+	</scriptdef>
+
+	<target name="prepare-local" description="Prepare the local folder property">
+		<property name="build" location="build" />
+		<property name="buildZip" location="Zip" />
+	</target>
+
+	<target name="prepare-final" description="Prepare the final folders properties">
+		<property name="build.dist" location="${build}/dist" />
+		<property name="build.dist.server" location="${build.dist}/Build_partyFarm" />
+		<property name="build.dist.server.gameserver" location="${build.dist.server}/gameserver" />
+		<property name="build.dist.server.dist" location="${build.dist.server}/dist" />
+	</target>
+
+	<target name="init" description="Create the output directories. Do nothing if dirs were already created">
+		<mkdir dir="${buildZip}" />
+		<mkdir dir="${build}" />
+		<mkdir dir="${build.dist}" />
+		<mkdir dir="${build.dist.server}" />
+		<mkdir dir="${build.dist.server.gameserver}" />
+		<mkdir dir="${build.dist.server.dist}" />
+	</target>
+
+	<target name="export" description="Syncronizes build space contents with project.">
+		<copy todir="${build.dist.server.gameserver}/data">
+			<fileset dir="${basedir}/gameserver/data">
+				<include name="**/*.*" />
+			</fileset>
+		</copy>
+		<copy todir="${build.dist.server.gameserver}">
+			<fileset dir="${basedir}/gameserver">
+				<include name="**/*.*" />
+			</fileset>
+		</copy>
+		<copy todir="${build.dist.server}">
+			<fileset dir="${basedir}/dist">
+				<include name="**/*.*" />
+			</fileset>
+		</copy>
+	</target>
+	<target name="dist-local" depends="prepare-local,prepare-final,export" description="Create distribution files and Zip one into 'Zip' folder.">
+		<zip destfile="${buildZip}/partyFarm_build.zip" basedir="${build.dist}" update="true" />
+		<delete dir="${build}" />
+	</target>
+</project>

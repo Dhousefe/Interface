@@ -1,0 +1,28 @@
+<project name="L2JBASE_MOD_TUTORIAL" default="dist" basedir=".">
+	<property name="src.dir" value="java" />
+	<property name="build.dir" value="bin" />
+	<property name="dist.dir" value="dist" />
+	<property name="output.jar" value="${dist.dir}/interface.ext.jar" />
+
+	<target name="init">
+		<mkdir dir="${build.dir}" />
+		<mkdir dir="${dist.dir}" />
+	</target>
+
+	<target name="compile" depends="init">
+		<javac srcdir="${src.dir}" destdir="${build.dir}" includeantruntime="false" release="21" />
+	</target>
+
+	<target name="jar" depends="compile">
+		<jar destfile="${output.jar}" basedir="${build.dir}" />
+	</target>
+
+	<target name="clean">
+		<delete dir="${build.dir}" />
+	</target>
+
+	<target name="dist" depends="jar">
+		<echo message="baseTutorial.ext JAR gerado com sucesso: ${output.jar}" />
+	</target>
+
+</project>
