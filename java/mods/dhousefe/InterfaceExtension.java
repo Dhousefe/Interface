@@ -117,25 +117,59 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
         return "Interface_BrProject";
     }
 
+    public void handleBypass(Player player, String bypass) {
+        var parts = bypass.split(" ", 2);
+        var action = parts[0];
+        var arguments = parts.length > 1 ? parts[1] : "";
+
+        if (action.startsWith("BuffEngine_Dispel")) {
+            var p = action.split("=");
+            if (p.length == 2) {
+                try {
+                    int skillId = Integer.parseInt(p[1]);
+                    player.stopSkillEffects(skillId);
+                } catch (NumberFormatException e) {
+                    LOGGER.warn("[" + getName() + "] Bypass BuffEngine_Dispel com skillId inválido: " + p[1]);
+                }
+            }
+            return;
+        }
+
+        switch (action) {
+            case "GkGo" -> {
+                if (!arguments.isEmpty()) handleTeleportRequest(player, arguments);
+            }
+            case "Shop" -> {
+                if (!arguments.isEmpty()) openAllowedMultisell(player, arguments);
+            }
+            case "BossStatus" -> {
+                IVoicedCommandHandler command = VoicedCommandHandler.getInstance().getHandler("raid");
+                if (command != null) {
+                    command.useVoicedCommand("raid", player, "");
+                }
+            }
+            default -> showMainMenu(player);
+        }
+    }
+
 
     @Override
     public String[] getVoicedCommandList() {
-        return new String[] { "donate" };
+        return new String[] { "donate", "bstatus" };
     }
 
     @Override
     public boolean useVoicedCommand(String command, Player player, String target)
     {
+        LOGGER.info("[" + getName() + "] Received voiced command " + command + " from " + player.getName());
+
         if (command.equalsIgnoreCase("donate")) {
-        // Log the action for debugging or security purposes
-        LOGGER.info("[" + getName() + "] Received voiced command '.donate' from " + player.getName());
-
-        // Call the method that handles bypass commands, passing the desired action
-        handleBypass(player, "_bbsgetfav_add");
-
-        // Return true to indicate that the command was successfully handled
+        handleBypass(player, "Shop");
         return true;
-    }
+        } else if (command.equalsIgnoreCase("bstatus")) {
+        handleBypass(player, "_bbsclan");
+        return true;
+        }
     
     // If it's not the .donate command, let the default handler take over
     return false;
@@ -335,42 +369,7 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
         player.sendPacket(npcHtmlMessage);
     }
 
-    public void handleBypass(Player player, String bypass) {
-        var parts = bypass.split(" ", 2);
-        var action = parts[0];
-        var arguments = parts.length > 1 ? parts[1] : "";
-
-        if (action.startsWith("BuffEngine_Dispel")) {
-            var p = action.split("=");
-            if (p.length == 2) {
-                try {
-                    int skillId = Integer.parseInt(p[1]);
-                    player.stopSkillEffects(skillId);
-                } catch (NumberFormatException e) {
-                    LOGGER.warn("[" + getName() + "] Bypass BuffEngine_Dispel com skillId inválido: " + p[1]);
-                }
-            }
-            return;
-        }
-
-        switch (action) {
-            case "GkGo" -> {
-                if (!arguments.isEmpty()) handleTeleportRequest(player, arguments);
-            }
-            case "Shop" -> {
-                if (!arguments.isEmpty()) openAllowedMultisell(player, arguments);
-            }
-            case "BossStatus" -> {
-                IVoicedCommandHandler command = VoicedCommandHandler.getInstance().getHandler("raid");
-                if (command != null) {
-                    command.useVoicedCommand("raid", player, "");
-                }
-            }
-            default -> showMainMenu(player);
-        }
-    }
-
-    
+       
     private void setAutoShotState(Player player, int shotId, boolean enable) {
         if (player.isInStoreMode() || player.isDead()) {
             return;
