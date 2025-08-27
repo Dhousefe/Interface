@@ -61,7 +61,7 @@ import ext.mods.gameserver.skills.L2Skill;
  * Ele se registra dinamicamente para ouvir bypasses, eliminando a necessidade
  * de integrar-se diretamente ao core do servidor.
  */
-public final class InterfaceExtension implements L2JExtension, OnBypassCommandListener {
+public final class InterfaceExtension implements L2JExtension, OnBypassCommandListener, IVoicedCommandHandler {
     private static final CLogger LOGGER = new CLogger(InterfaceExtension.class.getName());
     private static final String BYPASS_PREFIX = "voiced_interface";
 
@@ -92,12 +92,14 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
         loadConfigsFromIni();
         TeleportLocationData.getInstance().load();
         BypassCommandManager.getInstance().registerBypassListener(this);
+        VoicedCommandHandler.getInstance().registerHandler(this);
         LOGGER.info("[" + getName() + "] Carregado e registrado com sucesso.");
     }
 
     @Override
     public void onDisable() {
         BypassCommandManager.getInstance().unregisterBypassListener(this);
+        VoicedCommandHandler.getInstance().unregisterHandler(this);
         _virtualThreadExecutor.shutdown();
         try {
             if (!_virtualThreadExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -113,6 +115,30 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
     @Override
     public String getName() {
         return "Interface_BrProject";
+    }
+
+
+    @Override
+    public String[] getVoicedCommandList() {
+        return new String[] { "donate" };
+    }
+
+    @Override
+    public boolean useVoicedCommand(String command, Player player, String target)
+    {
+        if (command.equalsIgnoreCase("donate")) {
+        // Log the action for debugging or security purposes
+        LOGGER.info("[" + getName() + "] Received voiced command '.donate' from " + player.getName());
+
+        // Call the method that handles bypass commands, passing the desired action
+        handleBypass(player, "_bbsgetfav_add");
+
+        // Return true to indicate that the command was successfully handled
+        return true;
+    }
+    
+    // If it's not the .donate command, let the default handler take over
+    return false;
     }
 
     private void handleCommandAsync(Player player, String command) {
@@ -131,6 +157,12 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
                 handleRadiusAutoFarm(player, command);
             } else if (command.equals("_daniloAugment")) {
                 handleAugmentOpen(player);
+            } else if (command.startsWith("donate")) { 
+            handleBypass(player, "_bbsgetfav_add");
+            } else if (command.startsWith("bstatus")) { 
+            handleBypass(player, "_bbsclan");
+            } else if (command.equals("bp_openhtml mods/lucky/40079.htm")) { 
+            handleBypass(player, ".raid");
             } else if (command.startsWith(BYPASS_PREFIX)) {
                 final String actualCommand = command.substring(BYPASS_PREFIX.length()).trim();
                 handleBypass(player, actualCommand);
@@ -147,7 +179,7 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
     @Override
     public boolean onBypass(Player player, String command) {
         // Only handle commands that start with our BYPASS_PREFIX or specific known commands
-        //LOGGER.info("[" + getName() + "] Received bypass from " + player.getName() + ": " + command);
+        LOGGER.info("[" + getName() + "] Received bypass from " + player.getName() + ": " + command);
         if (command.startsWith(BYPASS_PREFIX) ||
             command.startsWith("RequestAutoShot:") ||
             command.startsWith("GkGo ") ||
@@ -156,7 +188,11 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
             command.startsWith("_autofarm") ||
             command.equals("_infosettings") ||
             command.startsWith("_radiusAutoFarm") ||
-            command.equals("_daniloAugment")) {
+            command.equals("_daniloAugment") ||
+            //command.equals("donate") || 
+            command.equals("raid") ||
+            command.equals("bstatus") ||
+            command.equals("bp_openhtml mods/lucky/40079.htm")) {
             
             _virtualThreadExecutor.execute(() -> handleCommandAsync(player, command));
             
@@ -284,10 +320,9 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
                         <br>
                         <p>Selecione um serviço abaixo:</p>
                         <br>
-                        <button value="Teleportes" action="bypass -h voiced_interface Gk" width=200 height=30 back="L2UI_CT1.Button_DF_Down" fore="L2UI_CT1.Button_DF">
-                        <button value="Loja" action="bypass -h voiced_interface Shop" width=200 height=30 back="L2UI_CT1.Button_DF_Down" fore="L2UI_CT1.Button_DF">
-                        <button value="Serviços" action="bypass -h voiced_interface Services" width=200 height=30 back="L2UI_CT1.Button_DF_Down" fore="L2UI_CT1.Button_DF">
-                        <button value="Status dos Bosses" action="bypass -h voiced_interface BossStatus" width=200 height=30 back="L2UI_CT1.Button_DF_Down" fore="L2UI_CT1.Button_DF">
+                        <button value="Loja" action="bypass -h voiced_interface Shop" width=200 height=30 back="L2butom.bitbuttom8_over" fore="L2butom.bitbuttom8">
+                        <button value="Serviços" action="bypass -h _bbsmemo" width=200 height=30 back="L2butom.bitbuttom8_over" fore="L2butom.bitbuttom8">
+                        <button value="Status dos Bosses" action="bypass -h voiced_interface BossStatus" width=200 height=30 back="L2butom.bitbuttom8_over" fore="L2butom.bitbuttom8">
                         <br>
                         <img src="L2UI_CH3.herotower_deco" width=256 height=32>
                     </center>
@@ -418,6 +453,10 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
             player.sendMessage("Você deve esperar para usar o teleporte novamente.");
             return false;
         }
+        if (player.getDungeon() != null) {
+            player.sendMessage("Você está em uma dungeon.");
+            return false;
+        }
 
         String restrictionReason = switch (player) {
             case Player p when p.isDead() -> "Você não pode se teleportar enquanto está morto.";
@@ -518,4 +557,6 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
             this(set.getString("id"), set.getInteger("price"), set.getBool("isNoble"), set.getInteger("SkillEffectId"), set.getInteger("x"), set.getInteger("y"), set.getInteger("z"));
         }
     }
+
+    
 }
