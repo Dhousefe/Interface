@@ -28,6 +28,7 @@ import ext.mods.commons.logging.CLogger;
 import ext.mods.extensions.interfaces.L2JExtension;
 import ext.mods.extensions.listener.command.OnBypassCommandListener;
 import ext.mods.extensions.listener.manager.BypassCommandManager;
+import ext.mods.gameserver.communitybbs.CustomCommunityBoard;
 import ext.mods.gameserver.data.SkillTable;
 import ext.mods.gameserver.data.xml.MultisellData;
 import ext.mods.gameserver.enums.GaugeColor;
@@ -148,6 +149,12 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
                     command.useVoicedCommand("raid", player, "");
                 }
             }
+            case "donate" -> {
+                CustomCommunityBoard.getInstance().handleCommands(player.getClient(), "_bbsgetfav_add");
+            }
+            case "statistic" -> {
+                CustomCommunityBoard.getInstance().handleCommands(player.getClient(), "_bbsclan");
+            }
             default -> showMainMenu(player);
         }
     }
@@ -164,10 +171,10 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
         LOGGER.info("[" + getName() + "] Received voiced command " + command + " from " + player.getName());
 
         if (command.equalsIgnoreCase("donate")) {
-        handleBypass(player, "Shop");
+        handleBypass(player, "donate");
         return true;
         } else if (command.equalsIgnoreCase("bstatus")) {
-        handleBypass(player, "_bbsclan");
+        handleBypass(player, "statistic");
         return true;
         }
     
@@ -194,7 +201,7 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
             } else if (command.startsWith("donate")) { 
             handleBypass(player, "_bbsgetfav_add");
             } else if (command.startsWith("bstatus")) { 
-            handleBypass(player, "_bbsclan");
+            handleBypass(player, "statistic");
             } else if (command.equals("bp_openhtml mods/lucky/40079.htm")) { 
             handleBypass(player, ".raid");
             } else if (command.startsWith(BYPASS_PREFIX)) {
