@@ -18,6 +18,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.stream.Stream;
+import java.awt.Color;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
@@ -40,6 +41,7 @@ import ext.mods.gameserver.handler.VoicedCommandHandler;
 import ext.mods.gameserver.model.actor.Player;
 import ext.mods.gameserver.model.entity.autofarm.AutoFarmManager;
 import ext.mods.gameserver.model.entity.autofarm.AutoFarmProfile;
+import ext.mods.gameserver.model.entity.autofarm.ZoneBuilder;
 import ext.mods.gameserver.model.entity.autofarm.AutoFarmManager.AutoFarmType;
 import ext.mods.gameserver.model.item.instance.ItemInstance;
 import ext.mods.gameserver.model.location.Location;
@@ -75,6 +77,13 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
 
     @Override
     public void onLoad() {
+        try {
+            copyResourceIfNotExists("mods/htmls/index.html", "./data/locale/en_US/html/interface/index.html");
+            
+        } catch (IOException e) {
+            LOGGER.warn(Level.SEVERE, "[" + getName() + "] Falha ao criar arquivos de configuração padrão.", e);
+            return;
+        }
         try {
             copyResourceIfNotExists("mods/configs/InterfaceConfig.ini", "./config/InterfaceConfig.ini");
             
@@ -119,9 +128,13 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
     }
 
     public void handleBypass(Player player, String bypass) {
+        //LOGGER.info("[" + getName() + "] handleBypass called with: '" + bypass + "'");
+        
         var parts = bypass.split(" ", 2);
         var action = parts[0];
         var arguments = parts.length > 1 ? parts[1] : "";
+        
+        //LOGGER.info("[" + getName() + "] Action: '" + action + "', Arguments: '" + arguments + "'");
 
         if (action.startsWith("BuffEngine_Dispel")) {
             var p = action.split("=");
@@ -138,37 +151,52 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
 
         switch (action) {
             case "GkGo" -> {
+                //LOGGER.info("[" + getName() + "] Processing GkGo command");
                 if (!arguments.isEmpty()) handleTeleportRequest(player, arguments);
             }
             case "Shop" -> {
+                //LOGGER.info("[" + getName() + "] Processing Shop command with arguments: " + arguments);
                 if (!arguments.isEmpty()) openAllowedMultisell(player, arguments);
             }
             case "BossStatus" -> {
+                //LOGGER.info("[" + getName() + "] Processing BossStatus command");
                 IVoicedCommandHandler command = VoicedCommandHandler.getInstance().getHandler("raid");
                 if (command != null) {
                     command.useVoicedCommand("raid", player, "");
                 }
             }
             case "donate" -> {
+                //LOGGER.info("[" + getName() + "] Processing donate command");
                 CustomCommunityBoard.getInstance().handleCommands(player.getClient(), "_bbsgetfav_add");
             }
             case "statistic" -> {
+                //LOGGER.info("[" + getName() + "] Processing statistic command");
                 CustomCommunityBoard.getInstance().handleCommands(player.getClient(), "_bbsclan");
             }
-            default -> showMainMenu(player);
+            case "Interfaceemail" -> {
+                //LOGGER.info("[" + getName() + "] Processing email command");
+                IVoicedCommandHandler commands = VoicedCommandHandler.getInstance().getHandler("email");
+                if (commands != null) {
+                    commands.useVoicedCommand("email", player, "");
+                }
+            }
+            default -> {
+                //LOGGER.info("[" + getName() + "] No matching action found, showing main menu");
+                showMainMenu(player);
+            }
         }
     }
 
 
     @Override
     public String[] getVoicedCommandList() {
-        return new String[] { "donate", "bstatus" };
+        return new String[] { "donate", "bstatus"};
     }
 
     @Override
     public boolean useVoicedCommand(String command, Player player, String target)
     {
-        LOGGER.info("[" + getName() + "] Received voiced command " + command + " from " + player.getName());
+        //LOGGER.info("[" + getName() + "] Received voiced command " + command + " from " + player.getName());
 
         if (command.equalsIgnoreCase("donate")) {
         handleBypass(player, "donate");
@@ -176,7 +204,7 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
         } else if (command.equalsIgnoreCase("bstatus")) {
         handleBypass(player, "statistic");
         return true;
-        }
+        } 
     
     // If it's not the .donate command, let the default handler take over
     return false;
@@ -184,6 +212,13 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
 
     private void handleCommandAsync(Player player, String command) {
         try {
+            //LOGGER.info("[" + getName() + "] handleCommandAsync processing: " + command);
+            
+            // Não processar comandos de email aqui para evitar loops
+            if (command.equals("email") || command.equals("voiced_interface Interfaceemail")) {
+                return;
+            }
+            
             if (command.startsWith("RequestAutoShot:")) {
                 handleRequestAutoShot(player, command);
             } else if (command.startsWith("GkGo ")) {
@@ -199,13 +234,15 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
             } else if (command.equals("_daniloAugment")) {
                 handleAugmentOpen(player);
             } else if (command.startsWith("donate")) { 
-            handleBypass(player, "_bbsgetfav_add");
+                handleBypass(player, "_bbsgetfav_add");
             } else if (command.startsWith("bstatus")) { 
-            handleBypass(player, "statistic");
+                handleBypass(player, "statistic");
             } else if (command.equals("bp_openhtml mods/lucky/40079.htm")) { 
-            handleBypass(player, ".raid");
+                handleBypass(player, ".raid");
             } else if (command.startsWith(BYPASS_PREFIX)) {
+                //LOGGER.info("[" + getName() + "] Processing voiced_interface command: " + command);
                 final String actualCommand = command.substring(BYPASS_PREFIX.length()).trim();
+                //LOGGER.info("[" + getName() + "] Extracted actual command: '" + actualCommand + "'");
                 handleBypass(player, actualCommand);
             } else {
                 LOGGER.warn("[" + getName() + "] Unknown or unhandled bypass command '" + command + "' from player " + player.getName());
@@ -219,8 +256,11 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
     
     @Override
     public boolean onBypass(Player player, String command) {
-        // Only handle commands that start with our BYPASS_PREFIX or specific known commands
-        LOGGER.info("[" + getName() + "] Received bypass from " + player.getName() + ": " + command);
+        
+        //LOGGER.info("[" + getName() + "] Received bypass from " + player.getName() + ": '" + command + "'");
+        //LOGGER.info("[" + getName() + "] BYPASS_PREFIX: '" + BYPASS_PREFIX + "'");
+        //LOGGER.info("[" + getName() + "] Command starts with BYPASS_PREFIX: " + command.startsWith(BYPASS_PREFIX));
+        
         if (command.startsWith(BYPASS_PREFIX) ||
             command.startsWith("RequestAutoShot:") ||
             command.startsWith("GkGo ") ||
@@ -230,18 +270,25 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
             command.equals("_infosettings") ||
             command.startsWith("_radiusAutoFarm") ||
             command.equals("_daniloAugment") ||
-            //command.equals("donate") || 
             command.equals("raid") ||
             command.equals("bstatus") ||
+            command.equals("email") ||
             command.equals("bp_openhtml mods/lucky/40079.htm")) {
             
-            _virtualThreadExecutor.execute(() -> handleCommandAsync(player, command));
+            //LOGGER.info("[" + getName() + "] Executing command asynchronously: " + command);
+            
+            // Processar comandos de email de forma síncrona para evitar loops
+            if (command.equals("voiced_interface Interfaceemail") || command.equals("email")) {
+                handleBypass(player, "Interfaceemail");
+            } else {
+                _virtualThreadExecutor.execute(() -> handleCommandAsync(player, command));
+            }
             
             return true; // Indicate that this bypass was handled by this listener
         }
         
+        //LOGGER.info("[" + getName() + "] Command not handled by this listener: " + command);
         return false; // Indicate that this bypass was not handled by this listener
-
     }
 
     private void handleAugmentOpen(Player player) {
@@ -301,7 +348,7 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
 
             int currentRadius = autoFarmProfile.getFinalRadius();
             int newRadius = switch (action) {
-                case "inc_radius" -> Math.max(currentRadius + 100, autoFarmProfile.getAreaMaxRadius());
+                case "inc_radius" -> Math.min(currentRadius + 100, autoFarmProfile.getAreaMaxRadius());
                 case "dec_radius" -> Math.min(currentRadius - 100, autoFarmProfile.getAreaMaxRadius());
                 default -> currentRadius;
             };
@@ -309,7 +356,48 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
             newRadius = Math.max(100, Math.min(newRadius, 1500));
 
             autoFarmProfile.setRadius(newRadius);
-            AutoFarmManager.getInstance().handleBypass(player, "options");
+            ZoneBuilder.getInstance().previewCylinder(player, autoFarmProfile.getFinalRadius());
+            
+            // Array de cores para alternar
+            java.awt.Color[] colors = {
+                java.awt.Color.YELLOW, java.awt.Color.RED, java.awt.Color.GREEN, java.awt.Color.MAGENTA, 
+                java.awt.Color.YELLOW, java.awt.Color.MAGENTA, java.awt.Color.ORANGE, java.awt.Color.PINK,
+                java.awt.Color.RED, java.awt.Color.GREEN
+            };
+            
+            // Atualizar o cilindro a cada 30ms por 3 segundos com cores alternadas
+            _virtualThreadExecutor.execute(() -> {
+                try {
+                    long startTime = System.currentTimeMillis();
+                    long endTime = startTime + 3000; 
+                    int colorIndex = 0;
+                    
+                    while (System.currentTimeMillis() < endTime) {
+                        if (!player.isOnline()) {
+                            break; 
+                        }
+                        
+                        
+                        java.awt.Color currentColor = colors[colorIndex % colors.length];
+                        ZoneBuilder.getInstance().previewCylinder(player, autoFarmProfile.getFinalRadius(), currentColor);
+                        
+                        
+                        colorIndex++;
+                        
+                        
+                        Thread.sleep(30);
+                    }
+                    
+                    if (player.isOnline()) {
+                        ZoneBuilder.getInstance().clearCylinderPreview(player);
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    //LOGGER.warn("[" + getName() + "] Timer de atualização do cilindro foi interrompido para o player " + player.getName(), e);
+                }
+            });
+            
+            //AutoFarmManager.getInstance().handleBypass(player, "options");
         }
         player.sendPacket(ActionFailed.STATIC_PACKET);
     }
@@ -350,30 +438,49 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
     }
 
     private void showMainMenu(Player player) {
-        final String html = """
-            <html>
-                <head><title>Painel de Controle</title></head>
-                <body>
-                    <center>
-                        <img src="L2UI_CH3.herotower_deco" width=256 height=32>
-                        <br>
-                        <h2>Bem-vindo, %playerName%!</h2>
-                        <br>
-                        <p>Selecione um serviço abaixo:</p>
-                        <br>
-                        <button value="Loja" action="bypass -h voiced_interface Shop" width=200 height=30 back="L2butom.bitbuttom8_over" fore="L2butom.bitbuttom8">
-                        <button value="Serviços" action="bypass -h _bbsmemo" width=200 height=30 back="L2butom.bitbuttom8_over" fore="L2butom.bitbuttom8">
-                        <button value="Status dos Bosses" action="bypass -h voiced_interface BossStatus" width=200 height=30 back="L2butom.bitbuttom8_over" fore="L2butom.bitbuttom8">
-                        <br>
-                        <img src="L2UI_CH3.herotower_deco" width=256 height=32>
-                    </center>
-                </body>
-            </html>
-            """;
+        try {
+            final var htmlFile = new File("./data/locale/en_US/html/interface/index.html");
+            if (!htmlFile.exists()) {
+                LOGGER.warn("[" + getName() + "] HTML file not found: " + htmlFile.getAbsolutePath());
+                player.sendMessage("Interface HTML file not found.");
+                return;
+            }
+            
+            String html = Files.readString(htmlFile.toPath());
+            html = html.replace("%playerName%", player.getName());
+            
+            // Adicionar validação de multisells permitidas
+            html = validateAndUpdateMultisellButtons(html, player);
+            
+            var npcHtmlMessage = new NpcHtmlMessage(0);
+            npcHtmlMessage.setHtml(html);
+            player.sendPacket(npcHtmlMessage);
+        } catch (IOException e) {
+            LOGGER.warn(Level.SEVERE, "[" + getName() + "] Failed to load HTML file for player " + player.getName(), e);
+            player.sendMessage("Failed to load interface.");
+        }
+    }
 
-        var npcHtmlMessage = new NpcHtmlMessage(0);
-        npcHtmlMessage.setHtml(html.replace("%playerName%", player.getName()));
-        player.sendPacket(npcHtmlMessage);
+    // Novo método para validar e atualizar botões de multisell
+    private String validateAndUpdateMultisellButtons(String html, Player player) {
+        // Verificar se o player tem permissão para acessar multisells
+        if (_allowedMultisells.length == 0) {
+            // Se não há multisells permitidas, remover ou desabilitar botões de shop
+            html = html.replaceAll(
+                "<button value=\"[^\"]*\" action=\"bypass -h voiced_interface Shop [0-9]+\"[^>]*>",
+                "<button value=\"Loja Indisponível\" action=\"bypass -h voiced_interface\" width=200 height=30 back=\"L2butom.bitbuttom8_over\" fore=\"L2butom.bitbuttom8\" disabled>"
+            );
+        } else {
+            // Validar se os botões no HTML correspondem às multisells permitidas
+            for (int multisellId : _allowedMultisells) {
+                String buttonPattern = "bypass -h voiced_interface Shop " + multisellId;
+                if (!html.contains(buttonPattern)) {
+                    LOGGER.warn("[" + getName() + "] Multisell ID " + multisellId + " está permitida mas não tem botão no HTML");
+                }
+            }
+        }
+        
+        return html;
     }
 
        
@@ -422,10 +529,23 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
         boolean allowed = Arrays.stream(_allowedMultisells).anyMatch(id -> id == multisellId);
 
         if (allowed) {
-            MultisellData.getInstance().separateAndSend(String.valueOf(multisellId), player, null, false);
+            try {
+                // Usar o mesmo método que CustomCommunityBoard usa
+                String multisellCommand = "_bbsmultisell;_maillist_0_1_0_;" + multisellId;
+                //LOGGER.info("[" + getName() + "] Abrindo multisell " + multisellId + " para " + player.getName() + " usando comando: " + multisellCommand);
+                
+                CustomCommunityBoard.getInstance().handleCommands(player.getClient(), multisellCommand);
+                
+                //LOGGER.info("[" + getName() + "] Player " + player.getName() + " abriu multisell " + multisellId);
+            } catch (Exception e) {
+                LOGGER.warn(Level.SEVERE, "[" + getName() + "] Erro ao abrir multisell " + multisellId + " para " + player.getName(), e);
+                player.sendMessage("Erro ao abrir a loja. Tente novamente.");
+            }
         } else {
-            LOGGER.warn("Player " + player.getName() + " tentou abrir a multisell não permitida: " + multisellId);
+            LOGGER.warn("[" + getName() + "] Player " + player.getName() + " tentou abrir a multisell não permitida: " + multisellId);
             player.sendMessage("Este serviço não está disponível.");
+            // Opcional: redirecionar de volta para o menu principal
+            showMainMenu(player);
         }
     }
 
@@ -542,7 +662,7 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
                     LOGGER.warn(Level.WARNING, "Erro ao carregar teleport location do XML: " + set.getString("id", "UNKNOWN"), e);
                 }
             }));
-            LOGGER.info("TeleportLocationData: Loaded " + _teleports.size() + " interface teleport locations.");
+            LOGGER.info("[Interface_BrProject] Loaded " + _teleports.size() + " interface teleport locations.");
         }
 
         public Optional<TeleportLocation> getTeleportLocation(String id) {
