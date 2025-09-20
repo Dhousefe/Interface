@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -39,10 +40,10 @@ import ext.mods.gameserver.handler.IVoicedCommandHandler;
 import ext.mods.gameserver.handler.ItemHandler;
 import ext.mods.gameserver.handler.VoicedCommandHandler;
 import ext.mods.gameserver.model.actor.Player;
-import ext.mods.gameserver.model.entity.autofarm.AutoFarmManager;
-import ext.mods.gameserver.model.entity.autofarm.AutoFarmProfile;
-import ext.mods.gameserver.model.entity.autofarm.ZoneBuilder;
-import ext.mods.gameserver.model.entity.autofarm.AutoFarmManager.AutoFarmType;
+import ext.mods.util.CryptaManager;
+import ext.mods.autofarm.AutoFarmProfile;
+import ext.mods.autofarm.ZoneBuilder;
+import ext.mods.autofarm.AutoFarmArea;
 import ext.mods.gameserver.model.item.instance.ItemInstance;
 import ext.mods.gameserver.model.location.Location;
 import ext.mods.gameserver.network.SystemMessageId;
@@ -54,7 +55,7 @@ import ext.mods.gameserver.network.serverpackets.MagicSkillUse;
 import ext.mods.gameserver.network.serverpackets.NpcHtmlMessage;
 import ext.mods.gameserver.network.serverpackets.SetupGauge;
 import ext.mods.gameserver.network.serverpackets.SystemMessage;
-import ext.mods.gameserver.skills.L2Skill;
+
 
 /**
  * @author Dhousefe
@@ -71,6 +72,8 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
     private int _teleportCastTime = 15000;
     private int _teleportSkillAnimationId = 2039;
     private int[] _allowedMultisells = {};
+    private Object _autoFarmManager = null;
+    private boolean _autoFarmAvailable = false;
 
     private final Map<Integer, Long> _teleportCooldowns = new ConcurrentHashMap<>();
     private final ExecutorService _virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
@@ -103,6 +106,7 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
         TeleportLocationData.getInstance().load();
         BypassCommandManager.getInstance().registerBypassListener(this);
         VoicedCommandHandler.getInstance().registerHandler(this);
+        initializeAutoFarmManager();
         LOGGER.info("[" + getName() + "] Carregado e registrado com sucesso.");
     }
 
@@ -125,6 +129,157 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
     @Override
     public String getName() {
         return "Interface_BrProject";
+    }
+
+    /**
+     * Inicializa o AutoFarmManager
+     */
+    private void initializeAutoFarmManager() {
+        try {
+            // Inicializar CryptaManager se necessário
+            CryptaManager.initialize();
+            
+            // Obter instância do AutoFarmManager
+            _autoFarmManager = CryptaManager.getAutoFarmManager();
+            
+            if (_autoFarmManager != null) {
+                // Testar se o AutoFarmManager está funcionando
+                if (testAutoFarmManager()) {
+                    _autoFarmAvailable = true;
+                    //LOGGER.info("[" + getName() + "] AutoFarmManager carregado e testado com sucesso via CryptaManager");
+                } else {
+                    LOGGER.warn("[" + getName() + "] AutoFarmManager carregado mas não está funcionando corretamente");
+                }
+            } else {
+                LOGGER.warn("[" + getName() + "] Falha ao carregar AutoFarmManager via CryptaManager");
+            }
+            
+        } catch (Exception e) {
+            LOGGER.warn(Level.SEVERE, "[" + getName() + "] Erro ao inicializar AutoFarmManager: " + e.getMessage(), e);
+        }
+    }
+
+    private boolean testAutoFarmManager() {
+        try {
+            // Testar método básico
+            Method getInstanceMethod = _autoFarmManager.getClass().getMethod("getInstance");
+            Object instance = getInstanceMethod.invoke(null);
+            return instance != null;
+        } catch (Exception e) {
+            LOGGER.warn("[" + getName() + "] Teste do AutoFarmManager falhou: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Obtém instância do AutoFarmManager via CryptaManager
+     */
+    private Object getAutoFarmManager() {
+        if (_autoFarmManager == null) {
+            initializeAutoFarmManager();
+        }
+        return _autoFarmManager;
+    }
+
+    private boolean isAutoFarmAvailable() {
+        return _autoFarmAvailable && _autoFarmManager != null;
+    }
+
+    /**
+     * Executa método do AutoFarmManager via reflexão
+     */
+    private Object executeAutoFarmMethod(String methodName, Object... args) {
+        if (!isAutoFarmAvailable()) {
+            LOGGER.warn("[" + getName() + "] AutoFarmManager não disponível para método: " + methodName);
+            return null;
+        }
+
+        try {
+            Object manager = getAutoFarmManager();
+            if (manager == null) {
+                return null;
+            }
+
+            // Determinar tipos dos argumentos
+            Class<?>[] paramTypes = new Class[args.length];
+            for (int i = 0; i < args.length; i++) {
+                if (args[i] != null) {
+                    paramTypes[i] = args[i].getClass();
+                } else {
+                    paramTypes[i] = Object.class;
+                }
+            }
+
+            // Tentar encontrar o método
+            Method method = null;
+            try {
+                method = manager.getClass().getMethod(methodName, paramTypes);
+            } catch (NoSuchMethodException e) {
+                // Tentar com tipos mais genéricos
+                Method[] methods = manager.getClass().getMethods();
+                for (Method m : methods) {
+                    if (m.getName().equals(methodName) && m.getParameterCount() == args.length) {
+                        method = m;
+                        break;
+                    }
+                }
+            }
+
+            if (method == null) {
+                LOGGER.warn("[" + getName() + "] Método " + methodName + " não encontrado no AutoFarmManager");
+                return null;
+            }
+
+            // Executar método via reflexão
+            return method.invoke(manager, args);
+
+        } catch (Exception e) {
+            LOGGER.warn(Level.SEVERE, "[" + getName() + "] Erro ao executar método " + methodName + " do AutoFarmManager: " + e.getMessage(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Obtém perfil do AutoFarm via reflexão
+     */
+    private Object getAutoFarmProfile(Player player) {
+        if (!isAutoFarmAvailable()) {
+            return null;
+        }
+
+        try {
+            Object manager = getAutoFarmManager();
+            if (manager == null) {
+                return null;
+            }
+
+            // Tentar diferentes assinaturas do método getProfile
+            Method method = null;
+            try {
+                method = manager.getClass().getMethod("getProfile", Player.class);
+            } catch (NoSuchMethodException e) {
+                // Tentar com Integer
+                try {
+                    method = manager.getClass().getMethod("getProfile", Integer.class);
+                    return method.invoke(manager, player.getObjectId());
+                } catch (NoSuchMethodException e2) {
+                    // Tentar getPlayer
+                    try {
+                        method = manager.getClass().getMethod("getPlayer", Integer.class);
+                        return method.invoke(manager, player.getObjectId());
+                    } catch (NoSuchMethodException e3) {
+                        LOGGER.warn("[" + getName() + "] Nenhum método de perfil encontrado no AutoFarmManager");
+                        return null;
+                    }
+                }
+            }
+
+            return method.invoke(manager, player);
+
+        } catch (Exception e) {
+            LOGGER.warn(Level.SEVERE, "[" + getName() + "] Erro ao obter perfil do AutoFarm: " + e.getMessage(), e);
+            return null;
+        }
     }
 
     public void handleBypass(Player player, String bypass) {
@@ -228,7 +383,12 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
             } else if (command.startsWith("autofarm") || command.startsWith("_autofarm")) {
                 handleAutoFarm(player, command);
             } else if (command.equals("_infosettings")) {
-                AutoFarmManager.getInstance().handleBypass(player, "skills page 1");
+                 if (isAutoFarmAvailable()) {
+                    executeAutoFarmMethod("handleBypass", player, "skills page 1");
+                } else {
+                    player.sendMessage("Sistema de AutoFarm não disponível no momento.");
+                }
+                
             } else if (command.startsWith("_radiusAutoFarm")) {
                 handleRadiusAutoFarm(player, command);
             } else if (command.equals("_daniloAugment")) {
@@ -275,9 +435,7 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
             command.equals("email") ||
             command.equals("bp_openhtml mods/lucky/40079.htm")) {
             
-            //LOGGER.info("[" + getName() + "] Executing command asynchronously: " + command);
             
-            // Processar comandos de email de forma síncrona para evitar loops
             if (command.equals("voiced_interface Interfaceemail") || command.equals("email")) {
                 handleBypass(player, "Interfaceemail");
             } else {
@@ -287,8 +445,8 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
             return true; // Indicate that this bypass was handled by this listener
         }
         
-        //LOGGER.info("[" + getName() + "] Command not handled by this listener: " + command);
-        return false; // Indicate that this bypass was not handled by this listener
+       
+        return false; 
     }
 
     private void handleAugmentOpen(Player player) {
@@ -328,35 +486,62 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
         String params = command.substring(prefix.length()).trim();
 
         if (prefix.equals("_autofarm") && params.isEmpty()) {
-            AutoFarmManager.getInstance().toggleFarmStatus(player);
+            executeAutoFarmMethod("toggleFarmStatus", player);
             player.sendPacket(ActionFailed.STATIC_PACKET);
         } else {
-            AutoFarmManager.getInstance().handleBypass(player, params);
+            executeAutoFarmMethod("handleBypass", player, params);
         }
     }
 
     private void handleRadiusAutoFarm(Player player, String command) {
-        var st = command.split(" ");
-        if (st.length > 1) {
-            final String action = st[1];
-            final var autoFarmProfile = AutoFarmManager.getInstance().getProfile(player);
+    var st = command.split(" ");
+    if (st.length > 1) {
+        final String action = st[1];
+        
+        // Obter AutoFarmProfile via CryptaManager (apenas AutoFarmManager é criptografado)
+        AutoFarmProfile autoFarmProfile = (AutoFarmProfile) ext.mods.util.CryptaManager.executeMethod("AutoFarmManager", "getProfile", player);
+        
+        if (autoFarmProfile == null) {
+            LOGGER.warn("[" + getName() + "] AutoFarmProfile não disponível para player: " + player.getName());
+            return;
+        }
 
-            if (autoFarmProfile.getSelectedArea() == null || autoFarmProfile.getSelectedArea().getType() == AutoFarmType.ZONA) {
-                AutoFarmManager.getInstance().showIndexWindow(player, "Radius cannot be changed for this area type.");
+        try {
+            // Obter área selecionada diretamente
+            AutoFarmArea selectedArea = autoFarmProfile.getSelectedArea();
+            
+            if (selectedArea == null) {
+                ext.mods.util.CryptaManager.executeMethod("AutoFarmManager", "showIndexWindow", player, "Radius cannot be changed for this area type.");
                 return;
             }
 
+            // Verificar tipo da área diretamente
+            Object areaType = selectedArea.getType();
+            
+            // Verificar se é ZONA
+            if (areaType.toString().equals("ZONA")) {
+                ext.mods.util.CryptaManager.executeMethod("AutoFarmManager", "showIndexWindow", player, "Radius cannot be changed for this area type.");
+                return;
+            }
+
+            // Obter raio atual e máximo diretamente
             int currentRadius = autoFarmProfile.getFinalRadius();
+            int maxRadius = autoFarmProfile.getAreaMaxRadius();
+
             int newRadius = switch (action) {
-                case "inc_radius" -> Math.min(currentRadius + 100, autoFarmProfile.getAreaMaxRadius());
-                case "dec_radius" -> Math.min(currentRadius - 100, autoFarmProfile.getAreaMaxRadius());
+                case "inc_radius" -> Math.min(currentRadius + 100, maxRadius);
+                case "dec_radius" -> Math.max(currentRadius - 100, 100);
                 default -> currentRadius;
             };
 
             newRadius = Math.max(100, Math.min(newRadius, 1500));
 
+            // Definir novo raio diretamente
             autoFarmProfile.setRadius(newRadius);
-            ZoneBuilder.getInstance().previewCylinder(player, autoFarmProfile.getFinalRadius());
+
+            // Atualizar preview do cilindro diretamente
+            ZoneBuilder zoneBuilder = ZoneBuilder.getInstance();
+            zoneBuilder.previewCylinder(player, newRadius);
             
             // Array de cores para alternar
             java.awt.Color[] colors = {
@@ -377,30 +562,42 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
                             break; 
                         }
                         
+                        // Obter raio atual diretamente
+                        int currentRadiusValue = autoFarmProfile.getFinalRadius();
                         
+                        // Atualizar preview com cor alternada
                         java.awt.Color currentColor = colors[colorIndex % colors.length];
-                        ZoneBuilder.getInstance().previewCylinder(player, autoFarmProfile.getFinalRadius(), currentColor);
                         
+                        // Tentar método com cor se disponível
+                        try {
+                            zoneBuilder.previewCylinder(player, currentRadiusValue, currentColor);
+                        } catch (Exception e) {
+                            // Fallback para método sem cor
+                            zoneBuilder.previewCylinder(player, currentRadiusValue);
+                        }
                         
                         colorIndex++;
-                        
                         
                         Thread.sleep(30);
                     }
                     
                     if (player.isOnline()) {
-                        ZoneBuilder.getInstance().clearCylinderPreview(player);
+                        zoneBuilder.clearCylinderPreview(player);
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     //LOGGER.warn("[" + getName() + "] Timer de atualização do cilindro foi interrompido para o player " + player.getName(), e);
+                } catch (Exception e) {
+                    LOGGER.warn("[" + getName() + "] Erro ao atualizar cilindro: " + e.getMessage(), e);
                 }
             });
             
-            //AutoFarmManager.getInstance().handleBypass(player, "options");
+        } catch (Exception e) {
+            LOGGER.warn(Level.SEVERE, "[" + getName() + "] Erro ao processar _radiusAutoFarm: " + e.getMessage(), e);
         }
-        player.sendPacket(ActionFailed.STATIC_PACKET);
     }
+    player.sendPacket(ActionFailed.STATIC_PACKET);
+}
 
     private void copyResourceIfNotExists(String resourcePath, String destinationPath) throws IOException {
         Path dest = Path.of(destinationPath);
