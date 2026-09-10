@@ -1,0 +1,67 @@
+diff --git a/java/net/sf/l2j/gameserver/listener/command/OnBypassCommandListener.java b/java/net/sf/l2j/gameserver/listener/command/OnBypassCommandListener.java
+new file mode 100644
+index 0000000..c0a5b81
+--- /dev/null
++++ b/java/net/sf/l2j/gameserver/listener/command/OnBypassCommandListener.java
+@@ -0,0 +1,11 @@
++package net.sf.l2j.gameserver.listener.command;
++
++import net.sf.l2j.gameserver.model.actor.Player;
++
++/**
++ * Interface listener para interceptacao de comandos bypass no aCis 409 vanilla.
++ */
++public interface OnBypassCommandListener
++{
++	boolean onBypass(Player player, String command);
++}
+diff --git a/java/net/sf/l2j/gameserver/listener/manager/BypassCommandManager.java b/java/net/sf/l2j/gameserver/listener/manager/BypassCommandManager.java
+new file mode 100644
+index 0000000..f581a02
+--- /dev/null
++++ b/java/net/sf/l2j/gameserver/listener/manager/BypassCommandManager.java
+@@ -0,0 +1,38 @@
++package net.sf.l2j.gameserver.listener.manager;
++
++import java.util.List;
++import java.util.concurrent.CopyOnWriteArrayList;
++
++import net.sf.l2j.gameserver.listener.command.OnBypassCommandListener;
++import net.sf.l2j.gameserver.model.actor.Player;
++
++/**
++ * Gerenciador thread-safe de despacho de bypasses para listeners registrados no aCis 409 vanilla.
++ */
++public class BypassCommandManager
++{
++	private static final BypassCommandManager INSTANCE = new BypassCommandManager();
++	
++	private final List<OnBypassCommandListener> listeners = new CopyOnWriteArrayList<>();
++	
++	public static BypassCommandManager getInstance()
++	{
++		return INSTANCE;
++	}
++	
++	public void registerBypassListener(OnBypassCommandListener listener)
++	{
++		listeners.add(listener);
++	}
++	
++	public void unregisterBypassListener(OnBypassCommandListener listener)
++	{
++		listeners.remove(listener);
++	}
++	
++	public boolean notify(Player player, String command)
++	{
++		for (OnBypassCommandListener listener : listeners)
++		{
++			if (listener.onBypass(player, command))
++			{
++				return true;
++			}
++		}
++		return false;
++	}
++}

@@ -1,0 +1,67 @@
+diff --git a/modules/game-server-core/src/main/java/ext/mods/extensions/listener/command/OnBypassCommandListener.java b/modules/game-server-core/src/main/java/ext/mods/extensions/listener/command/OnBypassCommandListener.java
+new file mode 100644
+index 0000000..c0a5b81
+--- /dev/null
++++ b/modules/game-server-core/src/main/java/ext/mods/extensions/listener/command/OnBypassCommandListener.java
+@@ -0,0 +1,11 @@
++package ext.mods.extensions.listener.command;
++
++import ext.mods.gameserver.model.actor.Player;
++
++/**
++ * Listener interface for intercepting client bypass commands.
++ */
++public interface OnBypassCommandListener
++{
++	boolean onBypass(Player player, String command);
++}
+diff --git a/modules/game-server-core/src/main/java/ext/mods/extensions/listener/manager/BypassCommandManager.java b/modules/game-server-core/src/main/java/ext/mods/extensions/listener/manager/BypassCommandManager.java
+new file mode 100644
+index 0000000..f581a02
+--- /dev/null
++++ b/modules/game-server-core/src/main/java/ext/mods/extensions/listener/manager/BypassCommandManager.java
+@@ -0,0 +1,38 @@
++package ext.mods.extensions.listener.manager;
++
++import java.util.List;
++import java.util.concurrent.CopyOnWriteArrayList;
++
++import ext.mods.extensions.listener.command.OnBypassCommandListener;
++import ext.mods.gameserver.model.actor.Player;
++
++/**
++ * Thread-safe manager responsible for dispatching bypass commands to registered listeners.
++ */
++public class BypassCommandManager
++{
++	private static final BypassCommandManager INSTANCE = new BypassCommandManager();
++	
++	private final List<OnBypassCommandListener> listeners = new CopyOnWriteArrayList<>();
++	
++	public static BypassCommandManager getInstance()
++	{
++		return INSTANCE;
++	}
++	
++	public void registerBypassListener(OnBypassCommandListener listener)
++	{
++		listeners.add(listener);
++	}
++	
++	public void unregisterBypassListener(OnBypassCommandListener listener)
++	{
++		listeners.remove(listener);
++	}
++	
++	public boolean notify(Player player, String command)
++	{
++		for (OnBypassCommandListener listener : listeners)
++		{
++			if (listener.onBypass(player, command))
++			{
++				return true;
++			}
++		}
++		return false;
++	}
++}

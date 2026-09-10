@@ -1,0 +1,17 @@
+diff --git a/java/net/sf/l2j/gameserver/network/clientpackets/RequestBypassToServer.java b/java/net/sf/l2j/gameserver/network/clientpackets/RequestBypassToServer.java
+--- a/java/net/sf/l2j/gameserver/network/clientpackets/RequestBypassToServer.java
++++ b/java/net/sf/l2j/gameserver/network/clientpackets/RequestBypassToServer.java
+@@ -20,6 +20,7 @@
+ import java.util.logging.Logger;
+ 
++import net.sf.l2j.gameserver.listener.manager.BypassCommandManager;
+ import net.sf.l2j.gameserver.communitybbs.CommunityBoard;
+@@ -48,6 +49,9 @@
+ 		final Player player = getClient().getPlayer();
+ 		if (player == null)
+ 			return;
+ 		
++		if (BypassCommandManager.getInstance().notify(player, _command))
++			return;
++		
+ 		if (_command.startsWith("admin_"))

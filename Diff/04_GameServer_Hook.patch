@@ -1,0 +1,12 @@
+diff --git a/modules/game-server-core/src/main/java/ext/mods/gameserver/GameServer.java b/modules/game-server-core/src/main/java/ext/mods/gameserver/GameServer.java
+--- a/modules/game-server-core/src/main/java/ext/mods/gameserver/GameServer.java
++++ b/modules/game-server-core/src/main/java/ext/mods/gameserver/GameServer.java
+@@ -25,6 +25,7 @@
+ import ext.mods.commons.logging.CLogger;
++import ext.mods.extensions.ExtensionLoader;
+ 
+@@ -250,6 +251,9 @@
+ 		StringUtil.printSection("Extensions");
++		ExtensionLoader.loadExtensions();
++		
+ 		StringUtil.printSection("System");

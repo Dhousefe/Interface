@@ -1,0 +1,19 @@
+diff --git a/modules/game-server-core/src/main/java/ext/mods/gameserver/network/clientpackets/RequestBypassToServer.java b/modules/game-server-core/src/main/java/ext/mods/gameserver/network/clientpackets/RequestBypassToServer.java
+--- a/modules/game-server-core/src/main/java/ext/mods/gameserver/network/clientpackets/RequestBypassToServer.java
++++ b/modules/game-server-core/src/main/java/ext/mods/gameserver/network/clientpackets/RequestBypassToServer.java
+@@ -28,6 +28,7 @@
+ import ext.mods.extensions.hooks.DungeonHooks;
+ import ext.mods.extensions.hooks.TranslatorHooks;
++import ext.mods.extensions.listener.manager.BypassCommandManager;
+ import ext.mods.gameserver.communitybbs.CommunityBoard;
+ import ext.mods.gameserver.communitybbs.CustomCommunityBoard;
+@@ -112,6 +113,9 @@
+ 		final Player player = getClient().getPlayer();
+ 		if (player == null)
+ 			return;
+ 		
++		if (BypassCommandManager.getInstance().notify(player, _command))
++			return;
++		
+ 		if (DonationHooks.get().handleBypass(player, _command))
+ 			return;
