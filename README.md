@@ -69,7 +69,7 @@ sequenceDiagram
     participant VT as 🧵 Virtual Thread Executor (Loom)
     participant Sub as 📦 Subsistemas (AutoFarm / Teleport / CBBS / Voiced)
 
-    Player->>Net: Envia bypass ("voiced_interface GkGo 125" / "RequestAutoShot")
+    Player->>Net: Envia bypass (voiced_interface GkGo 125 / RequestAutoShot)
     Net->>BpMgr: onBypass(player, command)
     BpMgr->>Ext: onBypass(player, command)
     
@@ -78,10 +78,10 @@ sequenceDiagram
         alt Comando Não Pertence ao Mod
             Ext-->>BpMgr: return false (Passa ao próximo listener do servidor)
         else Comando Especial Síncrono (ex: Email)
-            Ext->>Ext: handleBypass(player, "Interfaceemail")
+            Ext->>Ext: handleBypass(player, Interfaceemail)
             Ext-->>BpMgr: return true
         else Comando Assíncrono Válido
-            Ext->>VT: execute(() -> handleCommandAsync(player, command))
+            Ext->>VT: execute handleCommandAsync(player, command)
             Ext-->>BpMgr: return true (Libera a thread de rede imediatamente!)
         end
     end
@@ -91,21 +91,21 @@ sequenceDiagram
         VT->>Ext: handleCommandAsync(player, command)
         
         alt GkGo (Teleporte)
-            Ext->>Ext: canTeleport(player) -> Valida combate, karma, olympiad, adena
+            Ext->>Ext: canTeleport: valida combate, karma, olimpíada e adena
             Ext->>Sub: TeleportLocationData.get(id)
             Ext->>Player: SetupGauge (Azul) + MagicSkillUse (2013)
             VT->>VT: Thread.sleep(TeleportCastTime)
             VT->>Player: player.teleToLocation(location)
         else Shop (Multisell)
-            Ext->>Ext: Valida _allowedMultisells (BinarySearch)
-            Ext->>Sub: CustomCommunityBoard.handleCommands("_bbsmultisell;...")
+            Ext->>Ext: Valida _allowedMultisells via BinarySearch
+            Ext->>Sub: CustomCommunityBoard.handleCommands(_bbsmultisell [id])
         else RequestAutoShot
             Ext->>Sub: setAutoShotState(player, shotId, enable)
             Ext->>Player: ExAutoSoulShot + SystemMessage
         else Autofarm / Raio
             Ext->>Sub: AutoFarmManager.toggleFarmStatus / ZoneBuilder
         else DaniloAugment
-            Ext->>Player: SystemMessageId.SELECT_THE_ITEM_TO_BE_AUGMENTED + ExShowVariationMakeWindow
+            Ext->>Player: ExShowVariationMakeWindow + SystemMessage
         else Voiced Delegation (.raid, .premium, .skin, .tour, .epic)
             Ext->>Sub: VoicedCommandHandler.getHandler(cmd).useVoicedCommand(...)
         end
