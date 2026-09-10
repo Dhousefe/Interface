@@ -25,7 +25,7 @@
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │  L2J INTERFACE EXTENSION — ESPECIFICAÇÃO TÉCNICA E VISÃO GERAL                         │
-│  ├─ ☕ Runtime: Java 21 LTS / GraalVM (Project Loom Virtual Threads integradas)         │
+│  ├─ ☕ Runtime: Java 21 LTS (Project Loom Virtual Threads integradas)                   │
 │  ├─ 🔌 Interoperabilidade: RusaCis 3.8 / BrProject (L2JExtension) e aCis 409 Core       │
 │  ├─ ⚡ Processamento: 141M ops/s Routing & 98M ops/s Direct Int Parser no Hot-Path     │
 │  ├─ 📦 Auto-Deploy: Extração autônoma de .ini, .xml e .html no primeiro boot           │
@@ -57,58 +57,94 @@ O mod implementa as interfaces `L2JExtension`, `OnBypassCommandListener` e `IVoi
 
 ## 🔄 Diagrama de Fluxo de Bypass e Chamadas (Mermaid)
 
-O fluxo assíncrono detalha a jornada de um comando enviado pelo cliente do jogo até sua resolução:
+Para máxima clareza e visibilidade arquitetural, o ciclo de vida dos comandos é detalhado em duas perspectivas visuais: a **árvore de decisão de alto nível** e a **linha temporal de execução com Virtual Threads**.
+
+### 1. Árvore de Decisão e Roteamento de Tráfego
+
+```mermaid
+flowchart TD
+    classDef client fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff;
+    classDef netty fill:#334155,stroke:#64748b,stroke-width:2px,color:#fff;
+    classDef router fill:#1e3a8a,stroke:#60a5fa,stroke-width:2px,color:#fff;
+    classDef loom fill:#065f46,stroke:#34d399,stroke-width:2px,color:#fff;
+    classDef native fill:#475569,stroke:#94a3b8,stroke-width:1px,color:#fff;
+    classDef action fill:#0f766e,stroke:#2dd4bf,stroke-width:1px,color:#fff;
+
+    P["🎮 Jogador (Cliente Interlude)"]:::client -->|"Envia Bypass / Voiced"| N["🌐 Network Netty / NIO"]:::netty
+    N -->|"RequestBypassToServer"| B["🎛️ BypassCommandManager"]:::netty
+    B -->|"onBypass(player, command)"| R{"⚡ InterfaceExtension<br/>First-Char Router O(1)"}:::router
+
+    R -->|"Comando Não Reconhecido<br/>(admin, npc, bbs)"| RET_F["❌ Retorna false (Clean Fallthrough)"]:::native
+    RET_F -->|"Segue fluxo padrão"| ACIS["🏛️ Handlers Nativos do aCis Core"]:::native
+
+    R -->|"Comando Síncrono<br/>(_daniloAugment)"| SYNC["⚡ Resposta Imediata na Thread"]:::action
+    SYNC -->|"Envia ExShowVariationMakeWindow"| P
+
+    R -->|"Comando Assíncrono<br/>(GkGo, Shop, AutoFarm, Voiced)"| RET_T["✅ Retorna true<br/>(Libera Thread de Rede)"]:::router
+    RET_T -->|"Despacha Tarefa"| VT["🧵 Virtual Thread Executor<br/>(Project Loom)"]:::loom
+
+    VT --> GK["🌀 Teleport Engine<br/>Cast, Restrições & Cooldown"]:::action
+    VT --> SH["🛒 Community Multisell<br/>Validação O(log N) de Loja"]:::action
+    VT --> AF["🤖 AutoFarm & Holograma 3D<br/>Alternância & Cilindro de Raio"]:::action
+    VT --> VC["👑 Voiced Handlers<br/>Raid, Premium, Skin, Epic"]:::action
+
+    GK -.->|"Teletransporta"| P
+    SH -.->|"Abre Janela de Loja"| P
+    AF -.->|"Atualiza Estado / Projeta Raio"| P
+```
+
+### 2. Ciclo de Vida Temporal e Desacoplamento Concorrente
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Player as 🎮 Cliente Interlude
-    participant Net as 🌐 GameServer Network (Netty/NIO)
+    participant Net as 🌐 GameServer Network
     participant BpMgr as 🎛️ BypassCommandManager
     participant Ext as ⚡ InterfaceExtension
-    participant VT as 🧵 Virtual Thread Executor (Loom)
-    participant Sub as 📦 Subsistemas (AutoFarm / Teleport / CBBS / Voiced)
+    participant VT as 🧵 Virtual Thread (Loom)
+    participant Sub as 📦 Subsistemas Core
 
-    Player->>Net: Envia bypass (voiced_interface GkGo 125 / RequestAutoShot)
-    Net->>BpMgr: onBypass(player, command)
+    Player->>Net: Envia bypass (voiced_interface GkGo 125)
+    activate Net
+    Net->>BpMgr: notify(player, command)
+    activate BpMgr
     BpMgr->>Ext: onBypass(player, command)
+    activate Ext
     
-    rect rgb(240, 248, 255)
-        note over Ext: Roteamento Rápido O(1)<br/>Identifica se o comando pertence à Interface
-        alt Comando Não Pertence ao Mod
-            Ext-->>BpMgr: return false (Passa ao próximo listener do servidor)
-        else Comando Especial Síncrono (ex: Email)
-            Ext->>Ext: handleBypass(player, Interfaceemail)
-            Ext-->>BpMgr: return true
-        else Comando Assíncrono Válido
-            Ext->>VT: execute handleCommandAsync(player, command)
-            Ext-->>BpMgr: return true (Libera a thread de rede imediatamente!)
-        end
-    end
-
-    rect rgb(255, 250, 240)
-        note over VT, Sub: Execução Assíncrona em Virtual Thread
-        VT->>Ext: handleCommandAsync(player, command)
+    note over Ext: Roteador O(1) via First-Char Switch
+    
+    alt Caso 1: Comando Nativo do Jogo (admin, npc, etc.)
+        Ext-->>BpMgr: return false
+        BpMgr-->>Net: return false
+        note over Net: Fallthrough: executa handlers nativos aCis
+    else Caso 2: Comando Síncrono Instantâneo (_daniloAugment)
+        Ext->>Player: Envia ExShowVariationMakeWindow
+        Ext-->>BpMgr: return true
+        BpMgr-->>Net: return true
+    else Caso 3: Comando Assíncrono (GkGo, Shop, AutoFarm)
+        Ext->>VT: Despacha handleCommandAsync(player, command)
+        Ext-->>BpMgr: return true
+        deactivate Ext
+        BpMgr-->>Net: return true
+        deactivate BpMgr
+        note over Net: Thread de rede liberada imediatamente!
+        deactivate Net
         
+        activate VT
+        note over VT, Sub: Execução paralela em Virtual Thread leve
         alt GkGo (Teleporte)
-            Ext->>Ext: canTeleport: valida combate, karma, olimpíada e adena
-            Ext->>Sub: TeleportLocationData.get(id)
-            Ext->>Player: SetupGauge (Azul) + MagicSkillUse (2013)
+            VT->>Sub: Valida combate, karma, adena e cooldown
+            VT->>Player: SetupGauge (Azul) + MagicSkillUse (2013)
             VT->>VT: Thread.sleep(TeleportCastTime)
-            VT->>Player: player.teleToLocation(location)
+            VT->>Player: teleToLocation(x, y, z)
         else Shop (Multisell)
-            Ext->>Ext: Valida _allowedMultisells via BinarySearch
-            Ext->>Sub: CustomCommunityBoard.handleCommands(_bbsmultisell [id])
-        else RequestAutoShot
-            Ext->>Sub: setAutoShotState(player, shotId, enable)
-            Ext->>Player: ExAutoSoulShot + SystemMessage
-        else Autofarm / Raio
-            Ext->>Sub: AutoFarmManager.toggleFarmStatus / ZoneBuilder
-        else DaniloAugment
-            Ext->>Player: ExShowVariationMakeWindow + SystemMessage
-        else Voiced Delegation (.raid, .premium, .skin, .tour, .epic)
-            Ext->>Sub: VoicedCommandHandler.getHandler(cmd).useVoicedCommand(...)
+            VT->>Sub: Valida _allowedMultisells via BinarySearch
+            VT->>Player: Abre janela de Community Multisell
+        else AutoFarm / Raio
+            VT->>Sub: Alterna bot de farm e projeta cilindro holográfico
         end
+        deactivate VT
     end
 ```
 
