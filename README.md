@@ -16,7 +16,7 @@
 
 ---
 
-[📜 Manifesto L2JBrasil](#-manifesto-comunitário--ética-open-source-fórum-l2jbrasil) • [🏛️ Arquitetura](#️-arquitetura-técnica) • [🔄 Fluxo de Bypass](#-diagrama-de-fluxo-de-bypass-e-chamadas-mermaid) • [🎯 Casos de Uso](#-matriz-de-casos-de-uso--comandos-suportados) • [🚀 Instalação](#-guia-intuitivo-de-instalação-e-integração-passo-a-passo) • [🧩 Patches Git (Diff/)](#-cenário-3-aplicação-via-git-diff--patches-automatizados-pasta-diff) • [⚙️ Configurações](#️-configuração-e-personalização) • [🤝 Contribuição](#-como-contribuir)
+[📜 Manifesto L2JBrasil](#-manifesto-comunitário--ética-open-source-fórum-l2jbrasil) • [🏛️ Arquitetura](#️-arquitetura-técnica) • [🔄 Fluxo de Bypass](#-diagrama-de-fluxo-de-bypass-e-chamadas-mermaid) • [🎯 Casos de Uso](#-matriz-de-casos-de-uso--comandos-suportados) • [📖 Mapeamento Completo (doc/)](doc/INTERFACE_HTML_AND_BYPASS_MAPPING.md) • [🚀 Instalação](#-guia-intuitivo-de-instalação-e-integração-passo-a-passo) • [🧩 Patches Git (Diff/)](#-cenário-3-aplicação-via-git-diff--patches-automatizados-pasta-diff) • [⚙️ Configurações](#️-configuração-e-personalização) • [🤝 Contribuição](#-como-contribuir)
 
 ---
 
