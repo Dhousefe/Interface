@@ -165,6 +165,7 @@ sequenceDiagram
 | **💀 Status de Bosses** | `voiced_interface BossStatus`<br/>`.raid` | `VoicedCommandHandler` | Exibe a listagem de Raid Bosses com tempo de respawn e status vivo/morto. |
 | **👑 Módulos Adicionais** | `PremiumStatus`, `EpicStatus`<br/>`SkinStatus`, `TopEnchant`, `TourStatus` | Módulos Voiced | Delega chamadas para os sistemas VIP, Skins cosméticas, Torneios e Rankings sem acoplamento. |
 | **🚫 Buff Dispeller** | `BuffEngine_Dispel=<skillId>` | `handleBypass` | Cancela o efeito especificado imediatamente da barra de buffs do jogador. |
+| **🧙 Sell Buff Engine** | `BuffEngine_Dhousefe` | `handleBypass` | Redireciona para o comando `/buff` (UserCommand 203) e interface BuffShop com suporte a lojas offline. |
 
 ---
 

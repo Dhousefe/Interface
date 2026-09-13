@@ -25,6 +25,7 @@ import org.w3c.dom.NamedNodeMap;
 import ext.mods.commons.data.StatSet;
 import ext.mods.commons.data.xml.IXmlReader;
 import ext.mods.commons.logging.CLogger;
+import ext.mods.extensions.hooks.BuffShopHooks;
 import ext.mods.extensions.interfaces.L2JExtension;
 import ext.mods.extensions.listener.command.OnBypassCommandListener;
 import ext.mods.extensions.listener.manager.BypassCommandManager;
@@ -32,11 +33,16 @@ import ext.mods.gameserver.communitybbs.CustomCommunityBoard;
 import ext.mods.gameserver.data.SkillTable;
 import ext.mods.gameserver.enums.GaugeColor;
 import ext.mods.gameserver.enums.SayType;
+import ext.mods.gameserver.handler.BypassHandler;
+import ext.mods.gameserver.handler.IBypassHandler;
 import ext.mods.gameserver.handler.IItemHandler;
+import ext.mods.gameserver.handler.IUserCommandHandler;
 import ext.mods.gameserver.handler.IVoicedCommandHandler;
 import ext.mods.gameserver.handler.ItemHandler;
+import ext.mods.gameserver.handler.UserCommandHandler;
 import ext.mods.gameserver.handler.VoicedCommandHandler;
 import ext.mods.gameserver.model.actor.Player;
+import ext.mods.gameserver.model.actor.player.DungeonState;
 import ext.mods.gameserver.model.entity.autofarm.AutoFarmManager;
 import ext.mods.gameserver.model.entity.autofarm.AutoFarmManager.AutoFarmType;
 import ext.mods.gameserver.model.entity.autofarm.ZoneBuilder;
@@ -134,7 +140,7 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
             case 'v' -> command.startsWith(BYPASS_PREFIX);
             case 'R' -> command.startsWith("RequestAutoShot:");
             case 'G' -> command.startsWith("GkGo ");
-            case 'B' -> command.startsWith("BuffEngine_Dispel");
+            case 'B' -> command.startsWith("BuffEngine_Dispel") || command.equals("BuffEngine_Dhousefe");
             case 'a' -> command.startsWith("autofarm");
             case '_' -> command.startsWith("_autofarm") || 
                         command.equals("_infosettings") || 
@@ -143,9 +149,10 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
             case 'r' -> command.equals("raid");
             case 'b' -> command.equals("bstatus") || command.equals("bp_openhtml mods/lucky/40079.htm");
             case 'e' -> command.equals("email") || command.equals("epic");
-            case 'p' -> command.equals("premium");
+            case 'p' -> command.equals("premium") || command.equals("pvp");
             case 's' -> command.equals("skin");
             case 't' -> command.equals("topenchant") || command.equals("tour");
+            case 'f' -> command.equals("farmzone") || command.equals("farm");
             default -> false;
         };
 
@@ -197,7 +204,7 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
                     }
                 }
                 case 'B' -> {
-                    if (command.startsWith("BuffEngine_Dispel")) {
+                    if (command.startsWith("BuffEngine_Dispel") || command.equals("BuffEngine_Dhousefe")) {
                         handleBypass(player, command);
                     } else {
                         handleUnknownCommand(player, command);
@@ -226,6 +233,8 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
                 case 'p' -> {
                     if (command.equals("premium")) {
                         handleBypass(player, "PremiumStatus");
+                    } else if (command.equals("pvp")) {
+                        handleBypass(player, "farmzone");
                     } else {
                         handleUnknownCommand(player, command);
                     }
@@ -249,6 +258,13 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
                         handleBypass(player, "TopEnchant");
                     } else if (command.equals("tour")) {
                         handleBypass(player, "TourStatus");
+                    } else {
+                        handleUnknownCommand(player, command);
+                    }
+                }
+                case 'f' -> {
+                    if (command.equals("farmzone") || command.equals("farm")) {
+                        handleBypass(player, command);
                     } else {
                         handleUnknownCommand(player, command);
                     }
@@ -306,6 +322,14 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
         }
 
         switch (action) {
+            case "BuffEngine_Dhousefe" -> {
+                final IUserCommandHandler buffCmd = UserCommandHandler.getInstance().getHandler(203);
+                if (buffCmd != null) {
+                    buffCmd.useUserCommand(203, player);
+                } else if (BuffShopHooks.get() != null) {
+                    BuffShopHooks.get().showIndexWindow(player);
+                }
+            }
             case "GkGo" -> {
                 if (!arguments.isEmpty()) handleTeleportRequest(player, arguments);
             }
@@ -354,6 +378,17 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
                 IVoicedCommandHandler commands = VoicedCommandHandler.getInstance().getHandler("tour");
                 if (commands != null) {
                     commands.useVoicedCommand("tour", player, "");
+                }
+            }
+            case "farmzone", "FarmZone", "farm", "pvp" -> {
+                final IBypassHandler farmBypass = BypassHandler.getInstance().getHandler("farmzone");
+                if (farmBypass != null) {
+                    farmBypass.useBypass("farmzone", player, null);
+                } else {
+                    final IVoicedCommandHandler farmCmd = VoicedCommandHandler.getInstance().getHandler("farm");
+                    if (farmCmd != null) {
+                        farmCmd.useVoicedCommand("farm", player, "");
+                    }
                 }
             }
             default -> showMainMenu(player);
@@ -616,7 +651,7 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
             player.sendMessage("Voce deve esperar para usar o teleporte novamente.");
             return false;
         }
-        if (player.getDungeon() != null) {
+        if (DungeonState.get(player) != null) {
             player.sendMessage("Voce esta em uma dungeon.");
             return false;
         }

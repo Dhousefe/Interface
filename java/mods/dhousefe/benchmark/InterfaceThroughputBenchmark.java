@@ -62,7 +62,7 @@ public class InterfaceThroughputBenchmark {
             case 'v' -> command.startsWith("voiced_interface");
             case 'R' -> command.startsWith("RequestAutoShot:");
             case 'G' -> command.startsWith("GkGo ");
-            case 'B' -> command.startsWith("BuffEngine_Dispel");
+            case 'B' -> command.startsWith("BuffEngine_Dispel") || command.equals("BuffEngine_Dhousefe");
             case 'a' -> command.startsWith("autofarm");
             case '_' -> command.startsWith("_autofarm") || 
                         command.equals("_infosettings") || 

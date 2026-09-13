@@ -10,11 +10,24 @@
 	</target>
 
 	<target name="compile" depends="init">
-		<javac srcdir="${src.dir}" destdir="${build.dir}" includeantruntime="false" release="21" />
+		<javac srcdir="${src.dir}" destdir="${build.dir}" includeantruntime="false" release="21">
+			<classpath>
+				<fileset dir="libs">
+					<include name="*.jar" />
+				</fileset>
+			</classpath>
+		</javac>
+		<copy todir="${build.dir}">
+			<fileset dir="${src.dir}">
+				<exclude name="**/*.java" />
+			</fileset>
+		</copy>
 	</target>
 
 	<target name="jar" depends="compile">
-		<jar destfile="${output.jar}" basedir="${build.dir}" />
+		<jar destfile="${output.jar}" basedir="${build.dir}">
+			<exclude name="**/benchmark/**" />
+		</jar>
 	</target>
 
 	<target name="clean">
@@ -22,7 +35,7 @@
 	</target>
 
 	<target name="dist" depends="jar">
-		<echo message="baseTutorial.ext JAR gerado com sucesso: ${output.jar}" />
+		<echo message="interface.ext JAR gerado com sucesso: ${output.jar}" />
 	</target>
 
 </project>
