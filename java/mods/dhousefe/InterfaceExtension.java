@@ -26,6 +26,7 @@ import ext.mods.commons.data.StatSet;
 import ext.mods.commons.data.xml.IXmlReader;
 import ext.mods.commons.logging.CLogger;
 import ext.mods.extensions.hooks.BuffShopHooks;
+import ext.mods.extensions.hooks.FarmEventHooks;
 import ext.mods.extensions.interfaces.L2JExtension;
 import ext.mods.extensions.listener.command.OnBypassCommandListener;
 import ext.mods.extensions.listener.manager.BypassCommandManager;
@@ -381,6 +382,9 @@ public final class InterfaceExtension implements L2JExtension, OnBypassCommandLi
                 }
             }
             case "farmzone", "FarmZone", "farm", "pvp" -> {
+                if (FarmEventHooks.get().teleportToFarmZone(player)) {
+                    return;
+                }
                 final IBypassHandler farmBypass = BypassHandler.getInstance().getHandler("farmzone");
                 if (farmBypass != null) {
                     farmBypass.useBypass("farmzone", player, null);
